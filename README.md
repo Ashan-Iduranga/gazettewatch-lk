@@ -17,5 +17,6 @@ Next.js · FastAPI · Supabase (Postgres, pgvector, pg_trgm, Auth) · Gemini · 
 ## Docs
 - [Product requirements](docs/PRD.md)
 - [Architecture decisions](docs/adr/)
+- [PRD review & Phase 0–1 plan](docs/planning/prd-review.md)
 
 _Live demo, architecture diagram, evaluation results and setup instructions will be added as the project is built._

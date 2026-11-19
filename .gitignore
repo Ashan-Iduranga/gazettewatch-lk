@@ -1,0 +1,46 @@
+# ---- Private notes: never commit ----
+private/
+*.local.md
+
+# ---- Secrets ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+.vercel/
+npm-debug.log*
+coverage/
+playwright-report/
+test-results/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# ---- Ingestion data (downloaded PDFs, caches) ----
+data/
+*.pdf
+!apps/ingest/tests/fixtures/**/*.pdf
+
+# ---- Editors / OS ----
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Claude Code local settings ----
+.claude/settings.local.json

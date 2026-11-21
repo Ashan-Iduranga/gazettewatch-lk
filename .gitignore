@@ -44,3 +44,6 @@ desktop.ini
 
 # ---- Claude Code local settings ----
 .claude/settings.local.json
+
+# ---- Browser automation artefacts ----
+.playwright-mcp/

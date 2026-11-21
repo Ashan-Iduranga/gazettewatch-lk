@@ -23,4 +23,6 @@ What gets easier, what gets harder, what we must watch.
 004 Sinhala + English in v1, Tamil later
 005 Ingestion as a scheduled script, not an HTTP endpoint
 006 Gemini paid tier before public launch
+007 Personal data in gazette text (drafted)
+008 Embedding model and dimension (drafted)
 -->

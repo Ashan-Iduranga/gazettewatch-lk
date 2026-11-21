@@ -20,5 +20,7 @@ Next.js · FastAPI · Supabase (Postgres, pgvector, pg_trgm, Auth) · Gemini · 
 - [PRD review & Phase 0–1 plan](docs/planning/prd-review.md)
 - [Source notes: documents.gov.lk](docs/source-notes.md)
 - [Sample corpus & font inventory](docs/sample-corpus.md)
+- [Capacity & cost estimate](docs/planning/capacity.md)
+- ADR drafts: [007 personal data](docs/adr/0007-personal-data-in-gazette-text.md) · [008 embeddings](docs/adr/0008-embedding-model-and-dimension.md)
 
 _Live demo, architecture diagram, evaluation results and setup instructions will be added as the project is built._

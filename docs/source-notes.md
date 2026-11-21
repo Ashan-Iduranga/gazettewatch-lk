@@ -66,6 +66,10 @@ The response is in React Server Components format. Line `1:` holds plain JSON:
 3. **This is not a public, documented API.** It can change without notice. Keep the parser small and well
    tested, and add a Sentry alert for "listing returned 0 rows / schema changed".
 4. A plain HTML fallback doesn't exist: the first HTML response has no rows.
+5. **Offset paging is unstable.** Rows with the same date have no fixed order, so paging through 2024→2026
+   returned 82 rows twice and skipped 82 others. Use date windows that fit in one page (§8).
+6. **The site is sometimes unreachable** (connection timeouts for a few minutes, twice on 2026-11-21). The
+   crawler needs retries with backoff and must be resumable.
 
 ## 3. Fields in each row
 
@@ -110,10 +114,12 @@ e.g. …?file=/extra-gazette-content/G%2048538%20(S)_1794986718.pdf
 ## 5. Gazette number formats
 
 - The listing gives clean integers: `gazetteNo` + `gazetteSubNo`.
-  - **Canonical form:** store both integers. Unique key: `(gazette_no, gazette_sub_no)`.
-  - Display: `{no}/{sub:02d}` (no extra padding when the sub-number has 3 digits).
-- No duplicate numbers in the 100-row sample. A **uniqueness check over the full 2024+ listing** is still to do;
-  it's cheap (≈ 82 listing calls) and belongs in the first ingest dry-run.
+  - **Canonical form:** store both integers, indexed but **not unique**. The primary key is the site `id`
+    (`source_id`).
+  - Display: `{no}/{sub:02d}` (no extra padding when the sub-number has 3 digits; 114 rows have one).
+- **The full 2024+ pass found 22 numbers on more than one row**: duplicate entries with 0 files, re-entries, and
+  even different dates. De-dup rule: prefer the row with files, then the newest `updatedAt`. Details in
+  [sample-corpus.md](sample-corpus.md#listing-facts-from-the-full-2024-pass-8175-rows).
 - **User and PDF input will vary.** Inside PDFs and queries, expect forms like `2515/01`, `2515 / 1`, `No. 2515/01`
   and the Sinhala `අංක 2515/01`. Normalise with one regex `(\d{4})\s*/\s*(\d{1,3})` → `(no, sub)`.
 - Sub-numbers within one main number (e.g. 2514/32 … 2514/47) cover the same week.
@@ -134,7 +140,9 @@ e.g. …?file=/extra-gazette-content/G%2048538%20(S)_1794986718.pdf
 → Sinhala in 90 %, English in 94 %, and both si + en in about 87 %.
 
 **Fonts** (prefix-stripped `/BaseFont` names):
-- **Unicode Sinhala:** `IskoolaPota`, `IskoolaPota-Bold` in every Sinhala PDF, and also inside English PDFs for headers.
+- **Unicode Sinhala:** `IskoolaPota`, `IskoolaPota-Bold` in most Sinhala PDFs, and also inside English PDFs for
+  headers. *(The 0.3 corpus found that 5 of 20 Sinhala PDFs are **legacy-only**; see
+  [sample-corpus.md](sample-corpus.md#font-inventory-38-pdfs).)*
 - **Legacy (FM) Sinhala:** `FMAbhayax`, `FMAbabldBold` in most InDesign-made PDFs, **mixed with Iskoola Pota in
   the same file** (and `FMAbabldBold` even shows up in some English PDFs). So the font has to be decided
   **per text span**, not per page. This matters for the extraction order in CLAUDE.md.
@@ -158,7 +166,7 @@ That's about 210–250 gazettes a month (Jan 2024: 207, Jun 2024: 153), or **abo
 
 | Quantity | Estimate | Basis |
 |---|---|---|
-| si + en PDFs | **≈ 15,000** | 8,175 × 1.84 files (si 0.90 + en 0.94) |
+| si + en PDFs | **≈ 15,500** | full listing: 7,835 rows with si + 7,738 with en (the 100-row sample said ≈ 15,000) |
 | Pages | **≈ 45k–75k** | 12-PDF sample: median 2, mean 4.9 (one 37-page outlier) |
 | Download size | **≈ 3.7 GB** | ≈ 250 KB per PDF |
 | Backfill time at 1 req / 2.5 s | **≈ 10.5 h** of PDF fetching, plus ≈ 82 listing calls | more than the 6 h GitHub Actions job limit |
@@ -177,21 +185,24 @@ That's about 210–250 gazettes a month (Jan 2024: 207, Jun 2024: 153), or **abo
 
 ## 8. Incremental sync and re-uploads
 
-- **Late uploads are normal.** `updatedAt` trails `date` by up to 6 days, and a row can show up before all its
-  language files are uploaded.
-  - So a `--since` date window alone misses files. The daily run should re-list the **last 14 days** and diff
+- **Late uploads are normal.** `updatedAt` trails `date` by days to weeks (the full pass shows lags of up to about 25
+  days), and a row can show up before all its language files are uploaded.
+  - So a `--since` date window alone misses files. The daily run should re-list the **last 30 days** and diff
     each row's `contents[]` against what we have.
   - Rows with 0 files: store the row and retry the files later (per-document `attempts` / `next_retry_at`,
     PRD review item 14).
 - **Re-uploads:** a corrected file gets a new `uploadedFile` timestamp under the same `source_id` + `language`.
   Keep the newest and record the old hash.
-- **Multi-part gazettes:** in the sample each language had at most one file per row. Watch for more than one in
-  the full listing; the parser should accept a list anyway.
+- **Multi-part gazettes:** only 1 of 8,175 rows has more than one file per language, and the extras are `.epub`
+  copies. Filter `contents[]` to `.pdf`.
+- **Listing windows:** offset paging over a large range skips rows (see §2 risk 5). List month by month (one
+  page, `limit=400`), and split a month into halves when it has more than 400 rows.
 
 ## 9. Open questions (carry to 0.3 / 0.4 / 0.12)
 
-- [ ] Full 2024+ listing pass: unique `(no, sub)`? any rows with more than one file per language? how many rows have 0 files?
-- [ ] What do the `G` / `PG` file prefixes and the `(C)` tag mean? (Ask gpinfo@ or infer from content.)
-- [ ] Are there image-only scans in 2024–2026? (0.3)
+- [x] Full 2024+ listing pass: **`(no, sub)` not unique** (22 duplicates); 1 row with more than one file per
+  language (`.epub`); 122 rows with 0 files. See [sample-corpus.md](sample-corpus.md).
+- [ ] What do the `G` / `PG` file prefixes and the `(C)` tag mean? (asked in the gpinfo@ email draft)
+- [x] Image-only scans in 2024–2026? **None in 38 sampled PDFs**; keep the OCR fallback and log the rate in Phase 2.
 - [ ] Copyright / redistribution and a no-objection email to gpinfo@ (owner decision; ADR-007)
 - [ ] How the crawler gets the current `next-action` id (parse the JS chunk vs. a manual config value plus an alert)
